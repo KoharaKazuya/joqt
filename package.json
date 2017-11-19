@@ -1,0 +1,36 @@
+{
+  "name": "joqt",
+  "description": "Joqt is a centerized Flux Store",
+  "version": "0.1.0",
+  "author": "KoharaKazuya <reflect.results@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/KoharaKazuya/joqt/issues"
+  },
+  "devDependencies": {
+    "@types/jest": "^21.1.6",
+    "jest": "^21.2.1",
+    "typescript": "^2.6.1"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "package.json",
+    "lib",
+    "index.d.ts"
+  ],
+  "homepage": "https://github.com/KoharaKazuya/joqt",
+  "keywords": [
+    "flux",
+    "joqt"
+  ],
+  "license": "MIT",
+  "main": "lib/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KoharaKazuya/joqt"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "rm -rf lib && npm run build && jest"
+  }
+}
