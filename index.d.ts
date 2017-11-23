@@ -7,20 +7,18 @@ export interface Action {
   meta?: any;
 }
 
-export interface Store<S> {
-  getState(): S;
-  subscribe(subscriber: (state: S) => void): void;
-  dispatch(action: Action): void;
+export interface Reducer<S, A extends Action> {
+  (state: S, actionPayload?: A['payload']): S | Promise<S>;
 }
 
-export type Reducer<S> = (state: S, action: Action) => S | Promise<S>;
+export interface Store<S, A extends Action = Action> {
+  getState(): S;
+  dispatch(action: A): void;
+  subscribe(listener: () => void): void;
+}
 
-export type ReducerTreeNode<S> = { [K in keyof S]: ReducerTree<S[K]> }
-export type ReducerTree<S> = ReducerTreeNode<S> | Reducer<S>;
+export type MapStateAndActionTypeToReducer<A extends Action> = {
+  [key: string]: Reducer<any, A>;
+}
 
-export function createStore<S>(tree: ReducerTree<S>, initialState: S): Promise<Store<S>>;
-
-// utils
-
-export function combineReducers<S>(tree: ReducerTree<S>): Reducer<S>;
-export function getInitialState<S>(tree: ReducerTree<S>): Promise<S>;
+export function createStore<S, A extends Action = Action>(map: MapStateAndActionTypeToReducer<A>): Promise<Store<S>>;

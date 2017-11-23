@@ -1,104 +1,77 @@
-import { Action, Store, Reducer, ReducerTreeNode, ReducerTree } from '../index.d';
-import { getInitialState } from './utils/getInitialState';
+import {
+  Action,
+  MapStateAndActionTypeToReducer,
+  Reducer,
+  Store,
+} from "../index.d";
 
-abstract class BaseStore<S> implements Store<S> {
+export async function createStore<S, A extends Action = Action>(
+  map: MapStateAndActionTypeToReducer<A>,
+): Promise<Store<S>> {
 
-  private subscribers: ((state: S) => void)[] = [];
+  let state: S = undefined as any;
+  const listeners: Array<() => void> = [];
+  const transactions: { [key: string]: Promise<void> } = {};
 
-  public abstract getState(): S;
+  const getState = (keys: string[], self: any): any => {
+    if (keys.length === 0) { return self; }
+    if (typeof self !== "object") { self = {}; }
+    return getState(keys.slice(1), self[keys[0]]);
+  };
 
-  public subscribe(subscriber: (state: S) => void): void {
-    this.subscribers.push(subscriber);
-  }
+  const setState = (keys: string[], value: any): void => {
+    if (keys.length === 0) { state = value; return; }
 
-  public abstract dispatch(action: Action): void;
-
-  protected emit(): void {
-    for (let s of this.subscribers) {
-      s(this.getState());
+    if (typeof state !== "object") { state = {} as any; }
+    let target: any = state;
+    for (let i = 0; i < keys.length - 1; i++) {
+      const k = keys[i];
+      if (typeof target[k] !== "object") { target[k] = {}; }
+      target = target[k];
     }
-  }
-}
+    target[keys[keys.length - 1]] = value;
+  };
 
-class LeafStore<S> extends BaseStore<S> {
-
-  private state: S;
-  private taskQueue: Promise<S>;
-
-  private constructor(private reducer: Reducer<S>, initialState: S) {
-    super();
-    this.state = initialState;
-    this.taskQueue = Promise.resolve(initialState);
-  }
-
-  public static async create<S>(reducer: Reducer<S>, initialState: S): Promise<LeafStore<S>> {
-    return new LeafStore<S>(reducer, initialState);
-  }
-
-  public getState(): S {
-    return this.state;
-  }
-
-  public dispatch(action: Action): void {
-    this.taskQueue = this.taskQueue.then(async state => {
-      try {
-        return await this.reducer(state, action);
-      } catch (err) {
-        console.error(err);
-        return state;
-      }
-    });
-    this.taskQueue.then((state) => {
-      this.state = state;
-      this.emit();
-    });
-  }
-
-}
-
-class NodeStore<S> extends BaseStore<S> {
-
-  private children: { [K in keyof S]: Store<S[K]> };
-
-  private constructor() {
-    super();
-  }
-
-  public static async create<S>(tree: ReducerTreeNode<S>, initialState: S): Promise<NodeStore<S>> {
-    const instance = new NodeStore<S>();
-    await instance.initializeChildren(tree, initialState);
-    return instance;
-  }
-
-  public getState(): S {
-    const state: S = {} as any;
-    for (let key in this.children) {
-      state[key] = this.children[key].getState();
+  const handleAction = (action: A | { type: "init" }): void => {
+    const keys = Object.keys(map)
+      .filter((k) => k.endsWith(`#${ action.type }`))
+      .sort((a, b) => a.length - b.length);
+    for (const k of keys) {
+      const stateKeys = k.split("#")[0].split(".").filter((s) => s);
+      const stateKeyStr = stateKeys.join(".");
+      transactions[stateKeyStr] = handleNewTransaction(stateKeyStr, async () => {
+        const oldState = getState(stateKeys, state);
+        const newState = await map[k](oldState);
+        setState(stateKeys, newState);
+      });
     }
-    return state;
-  }
+  };
+  const handleNewTransaction = async (key: string, transaction: () => Promise<void>): Promise<void> => {
+    const ancestorTransaction = Object.keys(transactions).filter((k) => key.startsWith(k));
+    const descendantTransactions = Object.keys(transactions).filter((k) => k.startsWith(key));
+    const transactionsToWait = [...ancestorTransaction, ...descendantTransactions].map((k) => transactions[k]);
+    await Promise.all(transactionsToWait);
 
-  public dispatch(action: Action): void {
-    for (let key in this.children) {
-      this.children[key].dispatch(action);
-    }
-  }
+    await transaction();
 
-  private async initializeChildren(tree: ReducerTreeNode<S>, initialState: S): Promise<void> {
-    const keys = Object.keys(tree) as (keyof S)[];
-    const values = await Promise.all(keys.map(key => createStore(tree[key], initialState[key])));
+    listeners.forEach((l) => l());
+  };
 
-    this.children = {} as any;
-    for (let i = 0; i < keys.length; i++) {
-      this.children[keys[i]] = values[i];
-      this.children[keys[i]].subscribe(() => this.emit());
-    }
-  }
-}
+  const store: Store<S> = {
+    getState(): S {
+      return state;
+    },
+    dispatch(action: A): void {
+      handleAction(action);
+    },
+    subscribe(listener: () => void): void {
+      listeners.push(listener);
+    },
+  };
 
-export async function createStore<S>(tree: ReducerTree<S>, initialState?: S): Promise<Store<S>> {
-  if (initialState === undefined) { initialState = await getInitialState(tree); }
-  if (typeof tree === 'function') { return LeafStore.create(tree, initialState); }
-  if (typeof tree === 'object') { return NodeStore.create(tree, initialState); }
-  throw new Error('Unknown type: ' + typeof tree);
+  // initialize
+  handleAction({ type: "init" });
+  await Promise.all(Object.keys(transactions).map((k) => transactions[k]));
+
+  return store;
 }
