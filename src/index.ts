@@ -1,1 +1,1 @@
-export * from "./core";
+export { createStore } from "./store";

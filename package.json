@@ -1,13 +1,19 @@
 {
   "name": "joqt",
   "description": "Joqt is a centerized Flux Store",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "KoharaKazuya <reflect.results@gmail.com>",
   "bugs": {
     "url": "https://github.com/KoharaKazuya/joqt/issues"
   },
+  "dependencies": {
+    "lodash": "^4.17.4"
+  },
   "devDependencies": {
-    "@types/jest": "^21.1.6",
+    "@types/lodash": "^4.14.85",
+    "babel-core": "^6.26.0",
+    "babel-jest": "^21.2.0",
+    "babel-preset-stage-3": "^6.24.1",
     "jest": "^21.2.1",
     "tslint": "^5.8.0",
     "typescript": "^2.6.1"

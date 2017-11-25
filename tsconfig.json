@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2017",
     "module": "commonjs",
     "outDir": "lib",
-    "strict": true
+    "strict": true,
+    "lib": ["es2017", "esnext.asynciterable"]
   },
   "include": [
     "src/**/*"
